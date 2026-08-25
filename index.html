@@ -115,70 +115,76 @@
     // Instantiating with a distinct variable name to avoid global naming collisions
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let selectedDate = null;
+  let selectedDate = null;
 
-    async function init() {
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      if (user) {
-        document.getElementById('auth-section').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        loadCalendar();
-      }
-    }
-
-    async function login() {
-      await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
-    }
-
-    async function loadCalendar() {
-      const { data: entries } = await supabaseClient.from('daily_entries').select('*');
-      const entryMap = Object.fromEntries((entries || []).map(e => [e.date, e]));
-
-      const cal = document.getElementById('calendar');
-      cal.innerHTML = '';
+  // Listen for login/logout and session updates from the URL hash
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      document.getElementById('auth-section').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
       
-      const now = new Date();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayEl = document.createElement('div');
-        dayEl.className = 'day';
-        dayEl.textContent = day;
-
-        if (entryMap[dateStr]) {
-          dayEl.style.backgroundColor = entryMap[dateStr].color;
-        }
-
-        dayEl.onclick = () => openEditor(dateStr, entryMap[dateStr]);
-        cal.appendChild(dayEl);
+      // Clean up the long access token hash from the URL bar cleanly
+      if (window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, null, window.location.pathname);
       }
-    }
 
-    function openEditor(dateStr, entry) {
-      selectedDate = dateStr;
-      document.getElementById('selected-date').textContent = dateStr;
-      document.getElementById('color-picker').value = entry?.color || '#3b82f6';
-      document.getElementById('note-input').value = entry?.note || '';
-      document.getElementById('editor').style.display = 'block';
-    }
-
-    async function saveEntry() {
-      const color = document.getElementById('color-picker').value;
-      const note = document.getElementById('note-input').value;
-
-      await supabaseClient.from('daily_entries').upsert({
-        date: selectedDate,
-        color: color,
-        note: note
-      });
-
-      document.getElementById('editor').style.display = 'none';
       loadCalendar();
+    } else {
+      document.getElementById('auth-section').style.display = 'block';
+      document.getElementById('app').style.display = 'none';
     }
+  });
 
-    // Initialize session state check on launch
-    init();
+  async function login() {
+    await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+  }
+
+  async function loadCalendar() {
+    const { data: entries } = await supabaseClient.from('daily_entries').select('*');
+    const entryMap = Object.fromEntries((entries || []).map(e => [e.date, e]));
+
+    const cal = document.getElementById('calendar');
+    cal.innerHTML = '';
+    
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayEl = document.createElement('div');
+      dayEl.className = 'day';
+      dayEl.textContent = day;
+
+      if (entryMap[dateStr]) {
+        dayEl.style.backgroundColor = entryMap[dateStr].color;
+      }
+
+      dayEl.onclick = () => openEditor(dateStr, entryMap[dateStr]);
+      cal.appendChild(dayEl);
+    }
+  }
+
+  function openEditor(dateStr, entry) {
+    selectedDate = dateStr;
+    document.getElementById('selected-date').textContent = dateStr;
+    document.getElementById('color-picker').value = entry?.color || '#3b82f6';
+    document.getElementById('note-input').value = entry?.note || '';
+    document.getElementById('editor').style.display = 'block';
+  }
+
+  async function saveEntry() {
+    const color = document.getElementById('color-picker').value;
+    const note = document.getElementById('note-input').value;
+
+    await supabaseClient.from('daily_entries').upsert({
+      date: selectedDate,
+      color: color,
+      note: note
+    });
+
+    document.getElementById('editor').style.display = 'none';
+    loadCalendar();
+  }
   </script>
 </body>
 </html>
