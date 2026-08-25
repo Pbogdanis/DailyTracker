@@ -154,13 +154,16 @@
     }
 
     async function login() {
-      await supabaseClient.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
+  // Combine origin and pathname to preserve the /DailyTracker/ path
+  const redirectUrl = window.location.origin + window.location.pathname;
+  
+  await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: redirectUrl
     }
+  });
+}
 
     async function loadCalendar() {
       const { data: entries, error } = await supabaseClient.from('daily_entries').select('*');
