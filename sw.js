@@ -1,21 +1,19 @@
-const CACHE_NAME = 'daily-tracker-v1';
+const CACHE_NAME = 'daily-tracker-v2';
 const ASSETS = [
   '/DailyTracker/',
   '/DailyTracker/index.html',
   '/DailyTracker/manifest.json',
-  '/DailyTracker/icon.svg',
+  '/DailyTracker/icon-1024.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
-// Install: cache the app shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Activate immediately
 });
 
-// Activate: clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -23,10 +21,15 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+  
+  // Notify all clients that a new version is active
+  self.clients.matchAll().then((clients) => {
+    clients.forEach((client) => {
+      client.postMessage({ type: 'NEW_VERSION' });
+    });
+  });
 });
 
-// Fetch: serve from cache, fall back to network
-// Skip caching for Supabase API calls so data stays fresh
 self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('supabase.co')) return;
   if (event.request.method !== 'GET') return;

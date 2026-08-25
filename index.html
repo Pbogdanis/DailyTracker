@@ -338,11 +338,28 @@
 
     // Initialize
     renderColorOptions();
-    // Register the service worker
+
+// Listen for update notifications from service worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/DailyTracker/sw.js')
-    .then((reg) => console.log('SW registered:', reg.scope))
+    .then((reg) => {
+      console.log('SW registered:', reg.scope);
+      
+      // Check for updates every hour
+      setInterval(() => {
+        reg.update();
+      }, 60 * 60 * 1000);
+    })
     .catch((err) => console.error('SW failed:', err));
+  
+  // Show refresh prompt when new version is available
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data.type === 'NEW_VERSION') {
+      if (confirm('A new version is available! Reload to update?')) {
+        window.location.reload();
+      }
+    }
+  });
 }
     initAuth();
   </script>
