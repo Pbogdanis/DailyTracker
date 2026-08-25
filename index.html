@@ -19,12 +19,43 @@
       background: #121212; 
       color: #f3f4f6; 
     }
-    h2 { font-weight: 600; margin-bottom: 1.5rem; }
+    h2 { font-weight: 600; margin-bottom: 1.5rem; text-align: center; }
+    
+    /* Calendar Header */
+    .calendar-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 1rem; 
+    }
+    .calendar-header button { 
+      background: #333; 
+      color: #f3f4f6; 
+      border: 1px solid #444; 
+      padding: 6px 14px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-weight: 500;
+    }
+    .calendar-header button:hover { background: #444; }
+    .calendar-header h3 { margin: 0; font-size: 1.1rem; }
+
+    /* Weekday Labels */
+    .weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #9ca3af;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Calendar Grid */
     .grid { 
       display: grid; 
       grid-template-columns: repeat(7, 1fr); 
       gap: 8px; 
-      margin-top: 1rem; 
     }
     .day { 
       aspect-ratio: 1; 
@@ -36,9 +67,12 @@
       cursor: pointer; 
       background-color: #1e1e1e;
       font-weight: 500;
-      transition: transform 0.1s ease;
+      transition: transform 0.1s ease, background-color 0.2s ease;
     }
-    .day:hover { transform: scale(1.05); }
+    .day:hover { transform: scale(1.05); border-color: #555; }
+    .day.empty { visibility: hidden; pointer-events: none; }
+
+    /* Editor */
     .editor { 
       margin-top: 1.5rem; 
       background: #1e1e1e; 
@@ -47,20 +81,26 @@
       border: 1px solid #333;
       display: none; 
     }
-    .color-row {
+    .color-options {
       display: flex;
-      align-items: center;
       gap: 12px;
       margin: 1rem 0;
+      flex-wrap: wrap;
     }
-    input[type="color"] { 
-      border: none; 
-      width: 40px; 
-      height: 40px; 
+    .color-swatch { 
+      width: 36px; 
+      height: 36px; 
       border-radius: 50%; 
       cursor: pointer; 
-      background: none;
+      border: 2px solid transparent;
+      transition: transform 0.1s, border-color 0.1s;
     }
+    .color-swatch:hover { transform: scale(1.1); }
+    .color-swatch.active { 
+      border-color: #fff; 
+      box-shadow: 0 0 0 2px #2563eb; 
+    }
+    
     textarea { 
       width: 100%; 
       height: 80px; 
@@ -72,7 +112,7 @@
       font-family: inherit;
       resize: vertical;
     }
-    button { 
+    .btn-primary { 
       background: #2563eb; 
       color: white; 
       border: none; 
@@ -81,30 +121,38 @@
       font-weight: 500;
       cursor: pointer; 
       margin-top: 10px; 
+      width: 100%;
     }
-    button:hover { background: #1d4ed8; }
+    .btn-primary:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
 
   <h2>Daily Tracker</h2>
 
-  <div id="auth-section">
-    <button onclick="login()">Sign in with Google</button>
+  <div id="auth-section" style="text-align: center;">
+    <button class="btn-primary" style="max-width: 250px;" onclick="login()">Sign in with Google</button>
   </div>
 
   <div id="app" style="display:none;">
+    <div class="calendar-header">
+      <button onclick="changeMonth(-1)">&#8592; Prev</button>
+      <h3 id="current-month-year">Month Year</h3>
+      <button onclick="changeMonth(1)">Next &#8594;</button>
+    </div>
+
+    <div class="weekdays">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
     <div class="grid" id="calendar"></div>
 
     <div class="editor" id="editor">
       <h3 id="selected-date" style="margin-top:0;">Selected Date</h3>
-      <div class="color-row">
-        <label for="color-picker">Select Color:</label>
-        <input type="color" id="color-picker" value="#3b82f6">
-      </div>
+      <label>Select Color:</label>
+      <div class="color-options" id="color-options"></div>
       <textarea id="note-input" placeholder="Type a short note for this day..."></textarea>
       <br>
-      <button onclick="saveEntry()">Save Entry</button>
+      <button class="btn-primary" onclick="saveEntry()">Save Entry</button>
     </div>
   </div>
 
@@ -112,7 +160,6 @@
     const SUPABASE_URL = 'https://nxuxqhktugktjufocawb.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_5EXbtN2AUOhPLzy96iQPtg_uUObUCOX';
 
-    // Force explicit session detection from URL fragments (#access_token=)
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         detectSessionInUrl: true,
@@ -121,7 +168,38 @@
       }
     });
 
+    let viewDate = new Date(); // Tracks the currently viewed month
     let selectedDate = null;
+    let selectedColor = '#3b82f6';
+
+    const predefinedColors = [
+      '#3b82f6', // Blue
+      '#ef4444', // Red
+      '#22c55e', // Green
+      '#eab308', // Yellow
+      '#a855f7', // Purple
+      '#ec4899', // Pink
+      '#f97316', // Orange
+      '#6b7280'  // Gray
+    ];
+
+    function renderColorOptions() {
+      const container = document.getElementById('color-options');
+      container.innerHTML = '';
+      predefinedColors.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = color;
+        if (color === selectedColor) swatch.classList.add('active');
+        
+        swatch.onclick = () => {
+          selectedColor = color;
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+          swatch.classList.add('active');
+        };
+        container.appendChild(swatch);
+      });
+    }
 
     function renderUI(session) {
       const authSection = document.getElementById('auth-section');
@@ -131,7 +209,6 @@
         if (authSection) authSection.style.display = 'none';
         if (appSection) appSection.style.display = 'block';
 
-        // Clean the hash string from browser history after reading session
         if (window.location.hash.includes('access_token')) {
           window.history.replaceState(null, null, window.location.pathname);
         }
@@ -143,7 +220,6 @@
       }
     }
 
-    // Triggered automatically as soon as Supabase finishes parsing the URL hash
     supabaseClient.auth.onAuthStateChange((event, session) => {
       renderUI(session);
     });
@@ -154,18 +230,30 @@
     }
 
     async function login() {
-  // Combine origin and pathname to preserve the /DailyTracker/ path
-  const redirectUrl = window.location.origin + window.location.pathname;
-  
-  await supabaseClient.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: redirectUrl
+      const redirectUrl = window.location.origin + window.location.pathname;
+      await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl
+        }
+      });
     }
-  });
-}
+
+    function changeMonth(offset) {
+      viewDate.setDate(1); // Prevents month-skipping bugs on the 31st
+      viewDate.setMonth(viewDate.getMonth() + offset);
+      loadCalendar();
+    }
+
+    function updateMonthHeader() {
+      const options = { month: 'long', year: 'numeric' };
+      document.getElementById('current-month-year').textContent = viewDate.toLocaleDateString('en-US', options);
+    }
 
     async function loadCalendar() {
+      updateMonthHeader();
+      
+      // Fetch all entries (for a personal app, this is fast and simple)
       const { data: entries, error } = await supabaseClient.from('daily_entries').select('*');
       if (error) {
         console.error('Database Error:', error.message);
@@ -176,17 +264,29 @@
       const cal = document.getElementById('calendar');
       cal.innerHTML = '';
 
-      const now = new Date();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sunday
 
+      // Add empty slots for alignment
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        const emptyDay = document.createElement('div');
+        emptyDay.className = 'day empty';
+        cal.appendChild(emptyDay);
+      }
+
+      // Add actual days
       for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayEl = document.createElement('div');
         dayEl.className = 'day';
         dayEl.textContent = day;
 
         if (entryMap[dateStr]) {
           dayEl.style.backgroundColor = entryMap[dateStr].color;
+          dayEl.style.color = '#fff'; // Ensure text is readable on colored backgrounds
+          dayEl.style.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
         }
 
         dayEl.onclick = () => openEditor(dateStr, entryMap[dateStr]);
@@ -197,18 +297,24 @@
     function openEditor(dateStr, entry) {
       selectedDate = dateStr;
       document.getElementById('selected-date').textContent = dateStr;
-      document.getElementById('color-picker').value = entry?.color || '#3b82f6';
+      
+      // Set selected color and re-render swatches to show active state
+      selectedColor = entry?.color || '#3b82f6';
+      renderColorOptions();
+      
       document.getElementById('note-input').value = entry?.note || '';
       document.getElementById('editor').style.display = 'block';
+      
+      // Scroll to editor on mobile
+      document.getElementById('editor').scrollIntoView({ behavior: 'smooth' });
     }
 
     async function saveEntry() {
-      const color = document.getElementById('color-picker').value;
       const note = document.getElementById('note-input').value;
 
       const { error } = await supabaseClient.from('daily_entries').upsert({
         date: selectedDate,
-        color: color,
+        color: selectedColor,
         note: note
       });
 
@@ -221,6 +327,8 @@
       loadCalendar();
     }
 
+    // Initialize
+    renderColorOptions();
     initAuth();
   </script>
 </body>
