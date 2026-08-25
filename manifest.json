@@ -1,0 +1,19 @@
+{
+  "name": "Daily Tracker",
+  "short_name": "Tracker",
+  "description": "Track your daily moods and notes",
+  "start_url": "/DailyTracker/",
+  "scope": "/DailyTracker/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

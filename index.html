@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA manifest & theme -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121212">
+
+<!-- iOS support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tracker">
+<link rel="apple-touch-icon" href="icon.svg">
   <title>Daily Tracker</title>
   <link rel="icon" href="data:,">
 
@@ -329,6 +338,12 @@
 
     // Initialize
     renderColorOptions();
+    // Register the service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/DailyTracker/sw.js')
+    .then((reg) => console.log('SW registered:', reg.scope))
+    .catch((err) => console.error('SW failed:', err));
+}
     initAuth();
   </script>
 </body>
